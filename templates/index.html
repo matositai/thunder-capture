@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thunder Recorder Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #0056b3; }
+        .section { margin-bottom: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
+        .status-item { margin-bottom: 5px; }
+        .status-running { color: green; font-weight: bold; }
+        .status-stopped { color: red; font-weight: bold; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        button.start { background-color: #28a745; color: white; }
+        button.start:hover { background-color: #218838; }
+        button.stop { background-color: #dc3545; color: white; }
+        button.stop:hover { background-color: #c82333; }
+        button.restart { background-color: #007bff; color: white; }
+        button.restart:hover { background-color: #0069d9; }
+        button.save { background-color: #ffc107; color: #333; }
+        button.save:hover { background-color: #e0a800; }
+        button.sync { background-color: #333; color: white; }
+        button.sync:hover { background-color: #555; }
+        textarea {
+            width: calc(100% - 20px);
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #eee;
+            font-family: 'Courier New', Courier, monospace;
+            overflow-y: scroll;
+            white-space: pre;
+        }
+        .form-group { margin-bottom: 15px; }
+        .disabled-input { background-color: #e9ecef; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Thunder Recorder Control Panel</h1>
+
+        <div class="section">
+            <h2>System Status</h2>
+            <p class="status-item">Recorder Status: <span id="recorderStatus">Loading...</span></p>
+            <p class="status-item">PID: <span id="recorderPid">N/A</span></p>
+            <p class="status-item">Last Log Event: <span id="lastLogEvent">N/A</span></p>
+            <div class="controls">
+                <button class="start" onclick="startRecorder()">Start Recorder</button>
+                <button class="stop" onclick="stopRecorder()">Stop Recorder</button>
+                <button class="restart" onclick="restartRecorder()">Restart Recorder</button>
+                <button class="sync" onclick="gitSync()">Sync with Git Repo</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Configuration</h2>
+            <form id="configForm">
+                <div class="form-group">
+                    <label for="AS3935_I2C_ADDR">AS3935 I2C Address:</label>
+                    <input type="number" id="AS3935_I2C_ADDR" name="AS3935_I2C_ADDR" readonly class="disabled-input">
+                </div>
+                <div class="form-group">
+                    <label for="AS3935_CAPACITANCE">AS3935 Capacitance:</label>
+                    <input type="number" id="AS3935_CAPACITANCE" name="AS3935_CAPACITANCE">
+                </div>
+                <div class="form-group">
+                    <label for="IRQ_PIN">IRQ Pin (GPIO):</label>
+                    <input type="number" id="IRQ_PIN" name="IRQ_PIN" readonly class="disabled-input">
+                </div>
+                <div class="form-group">
+                    <label for="DEVICE">Audio Input Device (arecord -D):</label>
+                    <input type="text" id="DEVICE" name="DEVICE">
+                </div>
+                <div class="form-group">
+                    <label for="RECORDING_LENGTH">Recording Length (seconds):</label>
+                    <input type="number" id="RECORDING_LENGTH" name="RECORDING_LENGTH">
+                </div>
+                <div class="form-group">
+                    <label for="recording_directory">Recording Directory:</label>
+                    <input type="text" id="recording_directory" name="recording_directory">
+                </div>
+                <div class="form-group">
+                    <label for="noise_floor_lv1">Noise Floor Level (0-7):</label>
+                    <input type="number" id="noise_floor_lv1" name="noise_floor_lv1" min="0" max="7">
+                </div>
+                <div class="form-group">
+                    <label for="watchdog_threshold">Watchdog Threshold (0-7):</label>
+                    <input type="number" id="watchdog_threshold" name="watchdog_threshold" min="0" max="7">
+                </div>
+                <div class="form-group">
+                    <label for="spike_rejection">Spike Rejection (0-7):</label>
+                    <input type="number" id="spike_rejection" name="spike_rejection" min="0" max="7">
+                </div>
+                <div class="form-group">
+                    <label for="thunder_recorder_script">Recorder Script Path:</label>
+                    <input type="text" id="thunder_recorder_script" name="thunder_recorder_script" readonly class="disabled-input">
+                </div>
+                <div class="form-group">
+                    <label for="log_file">Log File Path:</label>
+                    <input type="text" id="log_file" name="log_file" readonly class="disabled-input">
+                </div>
+                <button type="button" class="save" onclick="saveConfig()">Save Configuration</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Logs</h2>
+            <textarea id="logOutput" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        const recorderStatusSpan = document.getElementById('recorderStatus');
+        const recorderPidSpan = document.getElementById('recorderPid');
+        const lastLogEventSpan = document.getElementById('lastLogEvent');
+        const logOutput = document.getElementById('logOutput');
+        const configForm = document.getElementById('configForm');
+
+        // Initial fetch on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchConfig();
+            fetchStatus();
+            fetchLogs();
+            setInterval(fetchStatus, 3000); // Update status every 3 seconds
+            setInterval(fetchLogs, 5000);   // Update logs every 5 seconds
+        });
+
+        async function fetchData(url, method = 'GET', data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            };
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching from ${url}:`, error);
+                return null;
+            }
+        }
+
+        async function fetchConfig() {
+            const config = await fetchData('/api/config');
+            if (config) {
+                for (const key in config) {
+                    const input = configForm.elements[key];
+                    if (input) {
+                        input.value = config[key];
+                    }
+                }
+            }
+        }
+
+        async function saveConfig() {
+            const formData = new FormData(configForm);
+            const config = {};
+            for (const [key, value] of formData.entries()) {
+                // Convert numbers back to actual numbers
+                if (key === "AS3935_I2C_ADDR" || key === "AS3935_CAPACITANCE" || key === "IRQ_PIN" ||
+                    key === "RECORDING_LENGTH" || key === "noise_floor_lv1" ||
+                    key === "watchdog_threshold" || key === "spike_rejection") {
+                    config[key] = parseInt(value, 10);
+                } else {
+                    config[key] = value;
+                }
+            }
+
+            const result = await fetchData('/api/config', 'POST', config);
+            if (result && result.status === 'success') {
+                alert('Configuration saved successfully!');
+            } else {
+                alert('Failed to save configuration: ' + (result ? result.message : 'Unknown error'));
+            }
+        }
+
+        async function fetchStatus() {
+            const status = await fetchData('/api/status');
+            if (status) {
+                recorderStatusSpan.textContent = status.running ? 'Running' : 'Stopped';
+                recorderStatusSpan.className = status.running ? 'status-running' : 'status-stopped';
+                recorderPidSpan.textContent = status.pid ? status.pid : 'N/A';
+            }
+        }
+
+        async function fetchLogs() {
+            const logs = await fetchData('/api/logs');
+            if (logs && logs.logs) {
+                logOutput.value = logs.logs.join('');
+                logOutput.scrollTop = logOutput.scrollHeight; // Scroll to bottom
+                if (logs.logs.length > 0) {
+                    lastLogEventSpan.textContent = logs.logs[logs.logs.length - 1];
+                }
+            }
+        }
+
+        async function startRecorder() {
+            const result = await fetchData('/api/start_recorder', 'POST');
+            if (result && result.status === 'success') {
+                alert('Recorder started!');
+            } else {
+                alert('Failed to start recorder: ' + (result ? result.message : 'Unknown error'));
+            }
+            fetchStatus(); // Update status immediately after action
+        }
+
+        async function stopRecorder() {
+            const result = await fetchData('/api/stop_recorder', 'POST');
+            if (result && result.status === 'success') {
+                alert('Recorder stopped!');
+            } else {
+                alert('Failed to stop recorder: ' + (result ? result.message : 'Unknown error'));
+            }
+            fetchStatus(); // Update status immediately after action
+        }
+
+        async function restartRecorder() {
+            const result = await fetchData('/api/restart_recorder', 'POST');
+            if (result && result.status === 'success') {
+                alert('Recorder restarted!');
+            } else {
+                alert('Failed to restart recorder: ' + (result ? result.message : 'Unknown error'));
+            }
+            fetchStatus(); // Update status immediately after action
+        }
+
+        async function gitSync() {
+            alert('Attempting to sync with Git repository... This may take a moment.');
+            const result = await fetchData('/api/git_sync', 'POST');
+            if (result) {
+                let fullMessage = 'Git Sync Output:\n\n' + result.output;
+                if (result.status === 'error') {
+                    fullMessage = 'Error during Git Sync:\n\n' + result.message + '\n\n' + result.output;
+                }
+                // Use a pre-formatted alert or a modal for better readability
+                alert(fullMessage);
+                
+                if (result.status === 'success' && (result.output.includes('Updating') || result.output.includes('changed'))) {
+                     if(confirm("Update successful. It is recommended to restart the recorder script to apply changes. Restart now?")) {
+                         // Note: This only restarts the recorder script, not the Flask server itself.
+                         // A full server restart would need to be done manually or with a process manager like systemd.
+                         restartRecorder();
+                     }
+                }
+            } else {
+                alert('Failed to get a response from the server for Git sync.');
+            }
+        }
+
+    </script>
+</body>
+</html>

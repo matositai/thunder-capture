@@ -3,31 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thunder Recorder Control</title>
+    <title>Thunder Recorder Control Panel</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
         .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         h1, h2 { color: #0056b3; }
         .section { margin-bottom: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
         .status-item { margin-bottom: 5px; }
-        .status-running { color: green; font-weight: bold; }
-        .status-stopped { color: red; font-weight: bold; }
+        .status-text { font-weight: bold; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         input[type="text"], input[type="number"] {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;
         }
         button {
-            padding: 10px 15px;
-            margin-right: 10px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
+            padding: 10px 15px; margin-right: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s ease;
         }
         button.start { background-color: #28a745; color: white; }
         button.start:hover { background-color: #218838; }
@@ -40,18 +29,17 @@
         button.sync { background-color: #333; color: white; }
         button.sync:hover { background-color: #555; }
         textarea {
-            width: calc(100% - 20px);
-            height: 300px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background-color: #eee;
-            font-family: 'Courier New', Courier, monospace;
-            overflow-y: scroll;
-            white-space: pre;
+            width: calc(100% - 20px); height: 300px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;
+            background-color: #eee; font-family: 'Courier New', Courier, monospace; overflow-y: scroll; white-space: pre;
         }
         .form-group { margin-bottom: 15px; }
         .disabled-input { background-color: #e9ecef; }
+        /* New Table Styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        td img { max-width: 100%; height: auto; display: block; }
     </style>
 </head>
 <body>
@@ -60,105 +48,74 @@
 
         <div class="section">
             <h2>System Status</h2>
-            <p class="status-item">Recorder Status: <span id="recorderStatus">Loading...</span></p>
-            <p class="status-item">PID: <span id="recorderPid">N/A</span></p>
-            <p class="status-item">Last Log Event: <span id="lastLogEvent">N/A</span></p>
+            <p class="status-item">Recorder Status: <span id="recorderStatus" class="status-text">Loading...</span></p>
             <div class="controls">
                 <button class="start" onclick="startRecorder()">Start Recorder</button>
                 <button class="stop" onclick="stopRecorder()">Stop Recorder</button>
-                <button class="restart" onclick="restartRecorder()">Restart Recorder</button>
                 <button class="sync" onclick="gitSync()">Sync with Git Repo</button>
             </div>
         </div>
 
         <div class="section">
-            <h2>Configuration</h2>
-            <form id="configForm">
-                <div class="form-group">
-                    <label for="AS3935_I2C_ADDR">AS3935 I2C Address:</label>
-                    <input type="number" id="AS3935_I2C_ADDR" name="AS3935_I2C_ADDR" readonly class="disabled-input">
-                </div>
-                <div class="form-group">
-                    <label for="AS3935_CAPACITANCE">AS3935 Capacitance:</label>
-                    <input type="number" id="AS3935_CAPACITANCE" name="AS3935_CAPACITANCE">
-                </div>
-                <div class="form-group">
-                    <label for="IRQ_PIN">IRQ Pin (GPIO):</label>
-                    <input type="number" id="IRQ_PIN" name="IRQ_PIN" readonly class="disabled-input">
-                </div>
-                <div class="form-group">
-                    <label for="DEVICE">Audio Input Device (arecord -D):</label>
-                    <input type="text" id="DEVICE" name="DEVICE">
-                </div>
-                <div class="form-group">
-                    <label for="RECORDING_LENGTH">Recording Length (seconds):</label>
-                    <input type="number" id="RECORDING_LENGTH" name="RECORDING_LENGTH">
-                </div>
-                <div class="form-group">
-                    <label for="recording_directory">Recording Directory:</label>
-                    <input type="text" id="recording_directory" name="recording_directory">
-                </div>
-                <div class="form-group">
-                    <label for="noise_floor_lv1">Noise Floor Level (0-7):</label>
-                    <input type="number" id="noise_floor_lv1" name="noise_floor_lv1" min="0" max="7">
-                </div>
-                <div class="form-group">
-                    <label for="watchdog_threshold">Watchdog Threshold (0-7):</label>
-                    <input type="number" id="watchdog_threshold" name="watchdog_threshold" min="0" max="7">
-                </div>
-                <div class="form-group">
-                    <label for="spike_rejection">Spike Rejection (0-7):</label>
-                    <input type="number" id="spike_rejection" name="spike_rejection" min="0" max="7">
-                </div>
-                <div class="form-group">
-                    <label for="thunder_recorder_script">Recorder Script Path:</label>
-                    <input type="text" id="thunder_recorder_script" name="thunder_recorder_script" readonly class="disabled-input">
-                </div>
-                <div class="form-group">
-                    <label for="log_file">Log File Path:</label>
-                    <input type="text" id="log_file" name="log_file" readonly class="disabled-input">
-                </div>
-                <button type="button" class="save" onclick="saveConfig()">Save Configuration</button>
-            </form>
+            <h2>Captured Events</h2>
+            <button class="restart" onclick="fetchRecordings()">Refresh List</button>
+            <div style="max-height: 500px; overflow-y: auto;">
+                <table id="recordingsTable">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Distance (km)</th>
+                            <th>Intensity</th>
+                            <th>Waveform</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rows will be inserted here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="section">
             <h2>Logs</h2>
             <textarea id="logOutput" readonly></textarea>
         </div>
+
+        <div class="section">
+            <h2>Configuration</h2>
+            <form id="configForm">
+                <!-- Configuration fields from before -->
+                <button type="button" class="save" onclick="saveConfig()">Save Configuration</button>
+            </form>
+        </div>
     </div>
 
     <script>
         const recorderStatusSpan = document.getElementById('recorderStatus');
-        const recorderPidSpan = document.getElementById('recorderPid');
-        const lastLogEventSpan = document.getElementById('lastLogEvent');
         const logOutput = document.getElementById('logOutput');
         const configForm = document.getElementById('configForm');
+        const recordingsTableBody = document.querySelector('#recordingsTable tbody');
 
         // Initial fetch on page load
         document.addEventListener('DOMContentLoaded', () => {
+            // Dynamically create config form fields (makes it easier to manage)
+            createConfigFields();
+
             fetchConfig();
             fetchStatus();
             fetchLogs();
-            setInterval(fetchStatus, 3000); // Update status every 3 seconds
-            setInterval(fetchLogs, 5000);   // Update logs every 5 seconds
+            fetchRecordings();
+            setInterval(fetchStatus, 5000);
+            setInterval(fetchLogs, 7000);
+            setInterval(fetchRecordings, 30000); // Refresh recordings list every 30 seconds
         });
 
         async function fetchData(url, method = 'GET', data = null) {
-            const options = {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            };
-            if (data) {
-                options.body = JSON.stringify(data);
-            }
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (data) options.body = JSON.stringify(data);
             try {
                 const response = await fetch(url, options);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
                 return await response.json();
             } catch (error) {
                 console.error(`Error fetching from ${url}:`, error);
@@ -166,46 +123,35 @@
             }
         }
 
-        async function fetchConfig() {
-            const config = await fetchData('/api/config');
-            if (config) {
-                for (const key in config) {
-                    const input = configForm.elements[key];
-                    if (input) {
-                        input.value = config[key];
-                    }
-                }
-            }
-        }
-
-        async function saveConfig() {
-            const formData = new FormData(configForm);
-            const config = {};
-            for (const [key, value] of formData.entries()) {
-                // Convert numbers back to actual numbers
-                if (key === "AS3935_I2C_ADDR" || key === "AS3935_CAPACITANCE" || key === "IRQ_PIN" ||
-                    key === "RECORDING_LENGTH" || key === "noise_floor_lv1" ||
-                    key === "watchdog_threshold" || key === "spike_rejection") {
-                    config[key] = parseInt(value, 10);
-                } else {
-                    config[key] = value;
-                }
-            }
-
-            const result = await fetchData('/api/config', 'POST', config);
-            if (result && result.status === 'success') {
-                alert('Configuration saved successfully!');
-            } else {
-                alert('Failed to save configuration: ' + (result ? result.message : 'Unknown error'));
-            }
-        }
-
         async function fetchStatus() {
             const status = await fetchData('/api/status');
             if (status) {
-                recorderStatusSpan.textContent = status.running ? 'Running' : 'Stopped';
-                recorderStatusSpan.className = status.running ? 'status-running' : 'status-stopped';
-                recorderPidSpan.textContent = status.pid ? status.pid : 'N/A';
+                recorderStatusSpan.textContent = status.system_state || 'N/A';
+                // Add color coding for state
+                const color = status.is_running ? 'green' : 'red';
+                recorderStatusSpan.style.color = color;
+            }
+        }
+
+        async function fetchRecordings() {
+            const recordings = await fetchData('/api/recordings');
+            if (!recordings) return;
+
+            recordingsTableBody.innerHTML = ''; // Clear existing table
+            for (const rec of recordings) {
+                const row = document.createElement('tr');
+                
+                const timestamp = new Date(rec.timestamp).toLocaleString();
+                const distance = rec.distance_km !== null ? rec.distance_km : 'N/A';
+                const intensity = rec.intensity !== null ? rec.intensity : 'N/A';
+
+                row.innerHTML = `
+                    <td>${timestamp}</td>
+                    <td>${distance}</td>
+                    <td>${intensity}</td>
+                    <td><img src="${rec.waveform_image_path}" alt="Waveform" /></td>
+                `;
+                recordingsTableBody.appendChild(row);
             }
         }
 
@@ -213,63 +159,96 @@
             const logs = await fetchData('/api/logs');
             if (logs && logs.logs) {
                 logOutput.value = logs.logs.join('');
-                logOutput.scrollTop = logOutput.scrollHeight; // Scroll to bottom
-                if (logs.logs.length > 0) {
-                    lastLogEventSpan.textContent = logs.logs[logs.logs.length - 1];
-                }
+                logOutput.scrollTop = logOutput.scrollHeight;
             }
         }
 
         async function startRecorder() {
             const result = await fetchData('/api/start_recorder', 'POST');
-            if (result && result.status === 'success') {
-                alert('Recorder started!');
-            } else {
-                alert('Failed to start recorder: ' + (result ? result.message : 'Unknown error'));
-            }
-            fetchStatus(); // Update status immediately after action
+            alert(result ? result.message : 'Request failed');
+            fetchStatus();
         }
 
         async function stopRecorder() {
             const result = await fetchData('/api/stop_recorder', 'POST');
-            if (result && result.status === 'success') {
-                alert('Recorder stopped!');
-            } else {
-                alert('Failed to stop recorder: ' + (result ? result.message : 'Unknown error'));
-            }
-            fetchStatus(); // Update status immediately after action
+            alert(result ? result.message : 'Request failed');
+            fetchStatus();
         }
 
-        async function restartRecorder() {
-            const result = await fetchData('/api/restart_recorder', 'POST');
-            if (result && result.status === 'success') {
-                alert('Recorder restarted!');
-            } else {
-                alert('Failed to restart recorder: ' + (result ? result.message : 'Unknown error'));
+        // --- Config form functions remain the same as before, but we need to create the fields first ---
+        function createConfigFields() {
+             const fields = [
+                { id: "AS3935_I2C_ADDR", label: "AS3935 I2C Address:", type: "number", readonly: true },
+                { id: "AS3935_CAPACITANCE", label: "AS3935 Capacitance:", type: "number" },
+                { id: "IRQ_PIN", label: "IRQ Pin (GPIO):", type: "number", readonly: true },
+                { id: "DEVICE", label: "Audio Input Device (arecord -D):", type: "text" },
+                { id: "RECORDING_LENGTH", label: "Recording Length (seconds):", type: "number" },
+                { id: "recording_directory", label: "Recording Directory:", type: "text" },
+                { id: "waveform_directory", label: "Waveform Directory:", type: "text", readonly: true },
+                { id: "noise_floor_lv1", label: "Noise Floor Level (0-7):", type: "number", min: 0, max: 7 },
+                { id: "watchdog_threshold", label: "Watchdog Threshold (0-7):", type: "number", min: 0, max: 7 },
+                { id: "spike_rejection", label: "Spike Rejection (0-7):", type: "number", min: 0, max: 7 },
+                { id: "thunder_recorder_script", label: "Recorder Script Path:", type: "text", readonly: true },
+                { id: "log_file", label: "Log File Path:", type: "text", readonly: true },
+                { id: "database_file", label: "Database File Path:", type: "text", readonly: true }
+            ];
+
+            let formHtml = '';
+            fields.forEach(field => {
+                formHtml += `
+                    <div class="form-group">
+                        <label for="${field.id}">${field.label}</label>
+                        <input type="${field.type}" id="${field.id}" name="${field.id}" 
+                               ${field.readonly ? 'readonly class="disabled-input"' : ''}
+                               ${field.min !== undefined ? `min="${field.min}"` : ''}
+                               ${field.max !== undefined ? `max="${field.max}"` : ''}>
+                    </div>
+                `;
+            });
+            // Find the save button and insert the form HTML before it
+            const saveButton = configForm.querySelector('.save');
+            saveButton.insertAdjacentHTML('beforebegin', formHtml);
+        }
+
+        async function fetchConfig() {
+            const config = await fetchData('/api/config');
+            if (config) {
+                for (const key in config) {
+                    if (configForm.elements[key]) {
+                        configForm.elements[key].value = config[key];
+                    }
+                }
             }
-            fetchStatus(); // Update status immediately after action
+        }
+
+        async function saveConfig() {
+            const config = {};
+            const elements = configForm.elements;
+            for (let i = 0; i < elements.length; i++) {
+                if (elements[i].name) {
+                    if (elements[i].type === 'number') {
+                        config[elements[i].name] = parseInt(elements[i].value, 10);
+                    } else {
+                        config[elements[i].name] = elements[i].value;
+                    }
+                }
+            }
+            const result = await fetchData('/api/config', 'POST', config);
+            alert(result ? result.message : 'Save request failed');
         }
 
         async function gitSync() {
-            alert('Attempting to sync with Git repository... This may take a moment.');
+            alert('Attempting to sync with Git repository...');
             const result = await fetchData('/api/git_sync', 'POST');
             if (result) {
-                let fullMessage = 'Git Sync Output:\n\n' + result.output;
-                if (result.status === 'error') {
-                    fullMessage = 'Error during Git Sync:\n\n' + result.message + '\n\n' + result.output;
-                }
-                // Use a pre-formatted alert or a modal for better readability
-                alert(fullMessage);
-                
+                alert('Git Sync Output:\n\n' + (result.output || result.message));
                 if (result.status === 'success' && (result.output.includes('Updating') || result.output.includes('changed'))) {
-                     if(confirm("Update successful. It is recommended to restart the recorder script to apply changes. Restart now?")) {
-                         // Note: This only restarts the recorder script, not the Flask server itself.
-                         // A full server restart would need to be done manually or with a process manager like systemd.
-                         restartRecorder();
+                     if(confirm("Update successful. It's recommended to restart the server. For now, you can restart the recorder to use new script code. Restart recorder?")) {
+                         stopRecorder().then(startRecorder);
                      }
                 }
             } else {
-                alert('Failed to get a response from the server for Git sync.');
+                alert('Failed to get a response from server for Git sync.');
             }
         }
 

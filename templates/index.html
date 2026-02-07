@@ -346,21 +346,25 @@
         async function fetchStatus() {
             const status = await fetchData('/api/status');
             if (status) {
-                detectorStatusSpan.textContent = status.system_state || 'N/A';
-                // Use bright yellow for running, orange for idle, or red for error/stopped
-                if (status.is_running) {
-                    detectorStatusSpan.style.color = 'var(--highlight-yellow)'; // Bright yellow for actively running
+                let displayStatus = status.system_state || 'N/A';
+                let statusColor = 'var(--border-color)'; // Default to gray/idle
+
+                if (['LISTENING', 'RECORDING', 'PROCESSING'].includes(status.system_state)) {
+                    displayStatus = 'Capturing... (' + status.system_state + ')';
+                    statusColor = 'var(--highlight-yellow)'; // Yellow for actively capturing
                     stopDetectorButton.disabled = false;
                     stopDetectorButton.classList.remove('button-disabled');
-                } else if (status.system_state === "LISTENING") { // New condition for LISTENING state
-                    detectorStatusSpan.style.color = 'var(--success-green)'; // Green for listening
-                    stopDetectorButton.disabled = false; // Still allow stopping if listening
-                    stopDetectorButton.classList.remove('button-disabled');
-                } else {
-                    detectorStatusSpan.style.color = 'var(--border-color)'; // Orange for idle
+                } else if (status.system_state === "IDLE") {
                     stopDetectorButton.disabled = true;
                     stopDetectorButton.classList.add('button-disabled');
+                } else if (status.system_state === "ERROR") {
+                    statusColor = 'var(--danger-red)'; // Red for error
+                    stopDetectorButton.disabled = false; // Allow stopping even in error
+                    stopDetectorButton.classList.remove('button-disabled');
                 }
+
+                detectorStatusSpan.textContent = displayStatus;
+                detectorStatusSpan.style.color = statusColor;
             }
         }
 
@@ -440,20 +444,30 @@
                 { id: "spike_rejection", label: "Spike Rejection (0-7):", type: "number", min: 0, max: 7 },
                 { id: "thunder_recorder_script", label: "Detector Script Path:", type: "text", readonly: true },
                 { id: "log_file", label: "Log File Path:", type: "text", readonly: true },
-                { id: "database_file", label: "Database File Path:", type: "text", readonly: true }
+                { id: "database_file", label: "Database File Path:", type: "text", readonly: true },
+                { id: "is_indoor", label: "Indoor Operation:", type: "checkbox" }
             ];
 
             let formHtml = '';
             fields.forEach(field => {
-                formHtml += `
-                    <div class="form-group">
-                        <label for="${field.id}">${field.label}</label>
-                        <input type="${field.type}" id="${field.id}" name="${field.id}" 
-                               ${field.readonly ? 'readonly class="disabled-input"' : ''}
-                               ${field.min !== undefined ? `min="${field.min}"` : ''}
-                               ${field.max !== undefined ? `max="${field.max}"` : ''}>
-                    </div>
-                `;
+                if (field.type === "checkbox") {
+                    formHtml += `
+                        <div class="form-group">
+                            <input type="checkbox" id="${field.id}" name="${field.id}">
+                            <label for="${field.id}">${field.label}</label>
+                        </div>
+                    `;
+                } else {
+                    formHtml += `
+                        <div class="form-group">
+                            <label for="${field.id}">${field.label}</label>
+                            <input type="${field.type}" id="${field.id}" name="${field.id}" 
+                                   ${field.readonly ? 'readonly class="disabled-input"' : ''}
+                                   ${field.min !== undefined ? `min="${field.min}"` : ''}
+                                   ${field.max !== undefined ? `max="${field.max}"` : ''}>
+                        </div>
+                    `;
+                }
             });
             const saveButton = configForm.querySelector('.save');
             saveButton.insertAdjacentHTML('beforebegin', formHtml);
@@ -463,8 +477,13 @@
             const config = await fetchData('/api/config');
             if (config) {
                 for (const key in config) {
-                    if (configForm.elements[key]) {
-                        configForm.elements[key].value = config[key];
+                    const element = configForm.elements[key];
+                    if (element) {
+                        if (element.type === "checkbox") {
+                            element.checked = config[key];
+                        } else {
+                            element.value = config[key];
+                        }
                     }
                 }
             }
@@ -475,7 +494,9 @@
             const elements = configForm.elements;
             for (let i = 0; i < elements.length; i++) {
                 if (elements[i].name) {
-                    if (elements[i].type === 'number' && elements[i].value !== '') {
+                    if (elements[i].type === "checkbox") {
+                        config[elements[i].name] = elements[i].checked;
+                    } else if (elements[i].type === 'number' && elements[i].value !== '') {
                         config[elements[i].name] = parseInt(elements[i].value, 10);
                     } else if (elements[i].value !== '') {
                         config[elements[i].name] = elements[i].value;

@@ -18,3 +18,4 @@ pip-selfcheck.json
 bootfs/
 thunder_recorder.log
 *.wav
+WavPlaceholders/

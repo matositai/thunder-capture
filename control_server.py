@@ -7,6 +7,8 @@ import sys
 import platform
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from datetime import datetime
+import collections
+from scipy.io import wavfile # Import wavfile to read duration
 
 # Custom module imports
 import database
@@ -23,6 +25,38 @@ SYSTEM_STATE = "IDLE" # Possible states: IDLE, LISTENING, RECORDING, PROCESSING,
 recorder_thread = None
 stop_event = threading.Event()
 state_lock = threading.Lock()
+
+# In-memory log cache
+log_lock = threading.Lock()
+log_cache = collections.deque(maxlen=200)
+
+# --- Logging Setup ---
+
+class StreamToLogger:
+    """
+    A file-like object that redirects a stream (like stdout or stderr)
+    to both the original stream and a thread-safe in-memory deque.
+    """
+    def __init__(self, original_stream, log_deque, lock):
+        self.original_stream = original_stream
+        self.log_deque = log_deque
+        self.lock = lock
+
+    def write(self, buf):
+        # Write to the original stream
+        self.original_stream.write(buf)
+        self.original_stream.flush()
+        # Append to our in-memory cache
+        with self.lock:
+            self.log_deque.append(buf)
+
+    def flush(self):
+        self.original_stream.flush()
+
+# Redirect stdout and stderr
+sys.stdout = StreamToLogger(sys.stdout, log_cache, log_lock)
+sys.stderr = StreamToLogger(sys.stderr, log_cache, log_lock)
+
 
 # --- Helper Functions ---
 
@@ -109,6 +143,7 @@ def recorder_lifecycle(config, stop_event_flag):
             os.makedirs(waveform_dir, exist_ok=True)
 
             recording_duration = config.get("RECORDING_LENGTH", 15)
+            actual_wav_duration = 0.0 # Initialize actual duration
 
             if IS_RASPBERRY_PI:
                 try:
@@ -117,6 +152,11 @@ def recorder_lifecycle(config, stop_event_flag):
                     arecord_cmd = ['arecord', '-D', device, '-f', 'cd', '-d', str(recording_duration), wav_filepath]
                     print(f"Executing: {' '.join(arecord_cmd)}")
                     subprocess.run(arecord_cmd, check=True)
+                    # Get actual duration after recording
+                    if os.path.exists(wav_filepath):
+                        samplerate, data = wavfile.read(wav_filepath)
+                        actual_wav_duration = len(data) / samplerate
+
                 except Exception as e:
                     print(f"Error during recording: {e}", file=sys.stderr)
                     set_system_state("ERROR")
@@ -127,6 +167,7 @@ def recorder_lifecycle(config, stop_event_flag):
                 time.sleep(2) # Simulate recording time
                 # Create a dummy empty wav file for the simulation
                 with open(wav_filepath, 'w') as f: f.write("dummy")
+                actual_wav_duration = recording_duration # In simulation, assume recorded length is config length
 
 
             # --- 3. PROCESSING State ---
@@ -142,7 +183,8 @@ def recorder_lifecycle(config, stop_event_flag):
                 'wav_filepath': wav_filepath,
                 'waveform_image_path': os.path.join('waveforms', waveform_filename), # Store relative path for web
                 'distance_km': lightning_data.get("distance_km"),
-                'intensity': lightning_data.get("intensity")
+                'intensity': lightning_data.get("intensity"),
+                'duration_seconds': actual_wav_duration # Add duration
             }
             database.add_recording(db_path, db_metadata)
         
@@ -216,6 +258,13 @@ def get_recordings():
     db_path = config.get("database_file", "db/recordings.db")
     all_recordings = database.get_all_recordings(db_path)
     return jsonify(all_recordings)
+
+@app.route('/api/logs')
+def get_logs():
+    with log_lock:
+        # Create a snapshot of the current logs
+        logs = list(log_cache)
+    return jsonify({"logs": logs})
 
 @app.route('/api/start_recorder', methods=['POST'])
 def api_start_recorder():

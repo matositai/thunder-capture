@@ -3,70 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Thunder Recorder Control Panel</title>
+    <title>Thunder Detector Control Panel</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1, h2 { color: #0056b3; }
-        .section { margin-bottom: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
-        .status-item { margin-bottom: 5px; }
+        :root {
+            --dark-bg: #1a1a1a; /* Very dark gray */
+            --primary-text: #e0e0e0; /* Light gray */
+            --container-bg: #2c2c2c; /* Darker gray */
+            --border-color: #444; /* Medium dark gray */
+            --header-color: #007bff; /* Blue */
+            --highlight-yellow: #ffc107; /* Yellow */
+            --success-green: #28a745; /* Green */
+            --danger-red: #dc3545; /* Red */
+            --button-text: #1a1a1a; /* Very dark gray for button text */
+        }
+
+        html, body {
+            height: 100%; /* Use 100% for body height for flexbox */
+            margin: 0;
+            padding: 0; /* Ensure no default margins/padding */
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--dark-bg); 
+            color: var(--primary-text);
+            display: flex; /* Enable flexbox for vertical layout */
+            flex-direction: column; /* Stack children vertically */
+        }
+
+        .container { 
+            max-width: 1200px; 
+            margin: 20px auto; 
+            background: var(--container-bg); 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            color: var(--dark-bg); /* Set text color for the container */
+            display: flex; /* Enable flexbox for vertical layout */
+            flex-direction: column; /* Stack children vertically */
+            flex-grow: 1; /* Allow container to grow and fill space */
+        }
+
+        h1, h2 { 
+            color: var(--header-color);
+            border-bottom: 2px solid var(--header-color);
+            padding-bottom: 10px;
+        }
+
+        .section { display: none; } /* Initially hide all sections */
+        .section.active { display: block; } /* Show only the active one */
+        #events.active { /* Apply flex properties only when events tab is active */
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1; /* Allow events section to grow */
+        }
+
+        .status-item { margin-bottom: 10px; font-size: 1.1em; }
         .status-text { font-weight: bold; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="number"] {
-            width: calc(100% - 22px); padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px;
+
+        .tab-nav { 
+            display: flex; 
+            border-bottom: 2px solid var(--border-color); 
+            margin-bottom: 20px;
         }
+        .tab-button {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background-color: transparent;
+            color: var(--primary-text);
+            font-size: 1.1em;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            color: var(--highlight-yellow);
+            border-bottom: 3px solid var(--highlight-yellow);
+        }
+        .tab-button:hover {
+            background-color: #383838;
+        }
+
         button {
-            padding: 10px 15px; margin-right: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s ease;
+            padding: 10px 15px; 
+            margin-right: 10px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            transition: background-color 0.3s ease;
+            color: var(--button-text);
         }
-        button.start { background-color: #28a745; color: white; }
+
+        button.start { background-color: var(--success-green); }
         button.start:hover { background-color: #218838; }
-        button.stop { background-color: #dc3545; color: white; }
+        button.stop { background-color: var(--danger-red); }
         button.stop:hover { background-color: #c82333; }
-        button.restart { background-color: #007bff; color: white; }
-        button.restart:hover { background-color: #0069d9; }
-        button.save { background-color: #ffc107; color: #333; }
+        button.refresh { background-color: var(--header-color); color: white; }
+        button.refresh:hover { background-color: #0069d9; }
+        button.save { background-color: var(--highlight-yellow); }
         button.save:hover { background-color: #e0a800; }
-        button.sync { background-color: #333; color: white; }
-        button.sync:hover { background-color: #555; }
-        textarea {
-            width: calc(100% - 20px); height: 300px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;
-            background-color: #eee; font-family: 'Courier New', Courier, monospace; overflow-y: scroll; white-space: pre;
+        button.sync { background-color: #555; color: white; }
+        button.sync:hover { background-color: #777; }
+        
+        textarea#logOutput {
+            width: calc(100% - 20px); 
+            height: 500px; 
+            padding: 10px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 4px;
+            background-color: #222; 
+            color: var(--primary-text);
+            font-family: 'Courier New', Courier, monospace; 
+            white-space: pre;
+            overflow-y: scroll;
         }
+
         .form-group { margin-bottom: 15px; }
-        .disabled-input { background-color: #e9ecef; }
-        /* New Table Styles */
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        td img { max-width: 100%; height: auto; display: block; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--primary-text); }
+        input[type="text"], input[type="number"] {
+            width: calc(100% - 22px); 
+            padding: 10px; 
+            margin-bottom: 10px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 4px;
+            background-color: #333;
+            color: var(--primary-text);
+        }
+        .disabled-input { background-color: #444; }
+
+        /* New Table Styles for Events */
+        #recordingsTable { 
+            width: 100%; 
+            min-width: 700px; /* Ensure table can overflow horizontally */
+            border-collapse: collapse; 
+            border-spacing: 0; /* Remove space between cells */
+        }
+        #recordingsTable tbody tr.metadata-row td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            background-color: #333; /* Match input background */
+            color: var(--primary-text); /* Match label text color */
+        }
+        #recordingsTable tbody tr.waveform-row td {
+            padding: 5px 10px;
+            border: 1px solid var(--border-color);
+            border-top: none; /* Remove top border to merge with row above */
+        }
+        #recordingsTable img {
+            width: 100%; /* Make waveform image fill the width */
+            max-height: 80px; /* Set a max height for the waveform */
+            object-fit: cover; /* Prevent image distortion */
+            height: auto;
+            display: block;
+            border-radius: 4px;
+        }
+        .table-container {
+            /* max-height: will be managed by dynamic height */
+            overflow-y: auto; /* Bring back vertical scrolling */
+            overflow-x: auto; /* Enable horizontal scrolling */
+            flex-grow: 1; /* Allow table container to grow and fill space */
+            position: relative; /* Establish stacking context for sticky header */
+            /* Re-add scrollbar hiding for Chrome, Safari, Opera */
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .table-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera*/
+        }
+        /* Remove scrollbar hiding for WebKit, as vertical is hidden by overflow-y: hidden */
+        .controls-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .events-header {
+            display: flex;
+            justify-content: space-between; /* Pushes items to ends */
+            align-items: center; /* Vertically centers items */
+            margin-bottom: 20px; /* Add some space below */
+        }
+        .right-aligned {
+            margin-left: auto;
+        }
+        .button-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #recordingsTable thead th {
+            position: sticky;
+            top: 0;
+            background-color: var(--container-bg); /* Match table background or a contrasting color */
+            color: var(--primary-text);
+            z-index: 100;
+            border-bottom: 2px solid var(--border-color);
+            font-size: 1.2em; /* Make header text bigger */
+            padding: 15px 12px; /* Add more padding */
+        }
+        .status-label {
+            color: var(--primary-text); /* Grey-white color for the label */
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Thunder Recorder Control Panel</h1>
+        <h1>Thunder Detector Control Panel</h1>
 
-        <div class="section">
-            <h2>System Status</h2>
-            <p class="status-item">Recorder Status: <span id="recorderStatus" class="status-text">Loading...</span></p>
-            <div class="controls">
-                <button class="start" onclick="startRecorder()">Start Recorder</button>
-                <button class="stop" onclick="stopRecorder()">Stop Recorder</button>
-                <button class="sync" onclick="gitSync()">Sync with Git Repo</button>
+        <div class="section-main">
+            <p class="status-item"><span class="status-label">Detector Status:</span> <span id="detectorStatus" class="status-text">Loading...</span></p>
+            <div class="controls-row">
+                <div>
+                    <button class="start" onclick="startDetector()">Start Detector</button>
+                    <button class="stop" id="stopDetectorButton" onclick="stopDetector()">Stop Detector</button>
+                </div>
+                <button class="sync right-aligned" onclick="gitSync()">Sync with Git Repo</button>
             </div>
         </div>
 
-        <div class="section">
-            <h2>Captured Events</h2>
-            <button class="restart" onclick="fetchRecordings()">Refresh List</button>
-            <div style="max-height: 500px; overflow-y: auto;">
+        <div class="tab-nav">
+            <button class="tab-button active" onclick="openTab(event, 'events')">Events</button>
+            <button class="tab-button" onclick="openTab(event, 'logs')">Logs</button>
+            <button class="tab-button" onclick="openTab(event, 'config')">Configuration</button>
+        </div>
+
+        <div id="events" class="section active">
+            <div class="events-header">
+                <h2>Captured Events</h2>
+                <button class="refresh" onclick="fetchRecordings()">Refresh List</button>
+            </div>
+            <div class="table-container">
                 <table id="recordingsTable">
                     <thead>
                         <tr>
-                            <th>Timestamp</th>
-                            <th>Distance (km)</th>
-                            <th>Intensity</th>
-                            <th>Waveform</th>
+                            <th style="width: 25%;">Timestamp</th>
+                            <th style="width: 25%;">File</th>
+                            <th style="width: 15%;">Duration</th>
+                            <th style="width: 20%;">Distance</th>
+                            <th style="width: 15%;">Intensity</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -76,39 +249,50 @@
             </div>
         </div>
 
-        <div class="section">
-            <h2>Logs</h2>
+        <div id="logs" class="section">
+            <h2>System Logs</h2>
             <textarea id="logOutput" readonly></textarea>
         </div>
 
-        <div class="section">
+        <div id="config" class="section">
             <h2>Configuration</h2>
             <form id="configForm">
-                <!-- Configuration fields from before -->
+                <!-- Configuration fields will be generated here -->
                 <button type="button" class="save" onclick="saveConfig()">Save Configuration</button>
             </form>
         </div>
     </div>
 
     <script>
-        const recorderStatusSpan = document.getElementById('recorderStatus');
+        const detectorStatusSpan = document.getElementById('detectorStatus');
+        const stopDetectorButton = document.getElementById('stopDetectorButton');
         const logOutput = document.getElementById('logOutput');
         const configForm = document.getElementById('configForm');
         const recordingsTableBody = document.querySelector('#recordingsTable tbody');
 
         // Initial fetch on page load
         document.addEventListener('DOMContentLoaded', () => {
-            // Dynamically create config form fields (makes it easier to manage)
             createConfigFields();
-
             fetchConfig();
             fetchStatus();
             fetchLogs();
             fetchRecordings();
+            
             setInterval(fetchStatus, 5000);
             setInterval(fetchLogs, 7000);
-            setInterval(fetchRecordings, 30000); // Refresh recordings list every 30 seconds
+            setInterval(fetchRecordings, 30000);
         });
+
+        function openTab(evt, tabName) {
+            const sections = document.querySelectorAll('.section');
+            sections.forEach(s => s.classList.remove('active'));
+            
+            const tabButtons = document.querySelectorAll('.tab-button');
+            tabButtons.forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
 
         async function fetchData(url, method = 'GET', data = null) {
             const options = { method, headers: { 'Content-Type': 'application/json' } };
@@ -126,10 +310,25 @@
         async function fetchStatus() {
             const status = await fetchData('/api/status');
             if (status) {
-                recorderStatusSpan.textContent = status.system_state || 'N/A';
-                // Add color coding for state
-                const color = status.is_running ? 'green' : 'red';
-                recorderStatusSpan.style.color = color;
+                detectorStatusSpan.textContent = status.system_state || 'N/A';
+                // Use bright yellow for running, orange for idle, or red for error/stopped
+                if (status.is_running) {
+                    detectorStatusSpan.style.color = 'var(--highlight-yellow)'; // Bright yellow for actively running
+                    stopDetectorButton.disabled = false;
+                    stopDetectorButton.classList.remove('button-disabled');
+                } else if (status.system_state === "LISTENING") { // New condition for LISTENING state
+                    detectorStatusSpan.style.color = 'var(--success-green)'; // Green for listening
+                    stopDetectorButton.disabled = false; // Still allow stopping if listening
+                    stopDetectorButton.classList.remove('button-disabled');
+                } else if (status.system_state === "IDLE") {
+                    detectorStatusSpan.style.color = 'var(--border-color)'; // Orange for idle
+                    stopDetectorButton.disabled = true;
+                    stopDetectorButton.classList.add('button-disabled');
+                } else {
+                    detectorStatusSpan.style.color = 'var(--danger-red)'; // Red for other non-running states (e.g., ERROR)
+                    stopDetectorButton.disabled = false; // Allow stopping even if in error state, for example
+                    stopDetectorButton.classList.remove('button-disabled');
+                }
             }
         }
 
@@ -138,44 +337,55 @@
             if (!recordings) return;
 
             recordingsTableBody.innerHTML = ''; // Clear existing table
-            for (const rec of recordings) {
-                const row = document.createElement('tr');
+            for (const rec of recordings.slice().reverse()) { // Show newest first
+                const metadataRow = document.createElement('tr');
+                metadataRow.className = 'metadata-row';
                 
                 const timestamp = new Date(rec.timestamp).toLocaleString();
-                const distance = rec.distance_km !== null ? rec.distance_km : 'N/A';
+                const distance = rec.distance_km !== null ? `${rec.distance_km} km` : 'N/A';
                 const intensity = rec.intensity !== null ? rec.intensity : 'N/A';
+                const filename = rec.wav_filepath ? rec.wav_filepath.split('/').pop() : 'N/A';
+                const duration = rec.duration_seconds !== null ? `${rec.duration_seconds.toFixed(2)}s` : 'N/A';
 
-                row.innerHTML = `
-                    <td>${timestamp}</td>
-                    <td>${distance}</td>
-                    <td>${intensity}</td>
-                    <td><img src="${rec.waveform_image_path}" alt="Waveform" /></td>
+
+                metadataRow.innerHTML = `
+                    <td style="width: 25%;">${timestamp}</td>
+                    <td style="width: 25%;">${filename}</td>
+                    <td style="width: 15%;">${duration}</td>
+                    <td style="width: 20%;">${distance}</td>
+                    <td style="width: 15%;">${intensity}</td>
                 `;
-                recordingsTableBody.appendChild(row);
+                
+                const waveformRow = document.createElement('tr');
+                waveformRow.className = 'waveform-row';
+                // Colspan should match the number of columns in metadataRow
+                waveformRow.innerHTML = `<td colspan="5"><img src="${rec.waveform_image_path}?t=${new Date().getTime()}" alt="Waveform" /></td>`;
+                
+                recordingsTableBody.appendChild(metadataRow);
+                recordingsTableBody.appendChild(waveformRow);
             }
         }
 
         async function fetchLogs() {
-            const logs = await fetchData('/api/logs');
-            if (logs && logs.logs) {
-                logOutput.value = logs.logs.join('');
+            const data = await fetchData('/api/logs');
+            if (data && data.logs) {
+                logOutput.value = data.logs.join('');
                 logOutput.scrollTop = logOutput.scrollHeight;
             }
         }
 
-        async function startRecorder() {
-            const result = await fetchData('/api/start_recorder', 'POST');
-            alert(result ? result.message : 'Request failed');
+        async function startDetector() {
+            const result = await fetchData('/api/start_recorder', 'POST'); // Backend still uses start_recorder
+            alert(result ? 'Detector start request: ' + result.message : 'Detector start request failed.');
             fetchStatus();
         }
 
-        async function stopRecorder() {
-            const result = await fetchData('/api/stop_recorder', 'POST');
-            alert(result ? result.message : 'Request failed');
+        async function stopDetector() {
+            const result = await fetchData('/api/stop_recorder', 'POST'); // Backend still uses stop_recorder
+            alert(result ? 'Detector stop request: ' + result.message : 'Detector stop request failed.');
             fetchStatus();
         }
-
-        // --- Config form functions remain the same as before, but we need to create the fields first ---
+        
         function createConfigFields() {
              const fields = [
                 { id: "AS3935_I2C_ADDR", label: "AS3935 I2C Address:", type: "number", readonly: true },
@@ -188,7 +398,7 @@
                 { id: "noise_floor_lv1", label: "Noise Floor Level (0-7):", type: "number", min: 0, max: 7 },
                 { id: "watchdog_threshold", label: "Watchdog Threshold (0-7):", type: "number", min: 0, max: 7 },
                 { id: "spike_rejection", label: "Spike Rejection (0-7):", type: "number", min: 0, max: 7 },
-                { id: "thunder_recorder_script", label: "Recorder Script Path:", type: "text", readonly: true },
+                { id: "thunder_recorder_script", label: "Detector Script Path:", type: "text", readonly: true },
                 { id: "log_file", label: "Log File Path:", type: "text", readonly: true },
                 { id: "database_file", label: "Database File Path:", type: "text", readonly: true }
             ];
@@ -205,7 +415,6 @@
                     </div>
                 `;
             });
-            // Find the save button and insert the form HTML before it
             const saveButton = configForm.querySelector('.save');
             saveButton.insertAdjacentHTML('beforebegin', formHtml);
         }
@@ -243,15 +452,14 @@
             if (result) {
                 alert('Git Sync Output:\n\n' + (result.output || result.message));
                 if (result.status === 'success' && (result.output.includes('Updating') || result.output.includes('changed'))) {
-                     if(confirm("Update successful. It's recommended to restart the server. For now, you can restart the recorder to use new script code. Restart recorder?")) {
-                         stopRecorder().then(startRecorder);
+                     if(confirm("Update successful. Restart the server to apply changes. Restart detector now to use new script code?")) {
+                         stopDetector().then(startDetector);
                      }
                 }
             } else {
                 alert('Failed to get a response from server for Git sync.');
             }
         }
-
     </script>
 </body>
 </html>

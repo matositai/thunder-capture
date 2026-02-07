@@ -203,6 +203,29 @@
         .status-label {
             color: var(--primary-text); /* Grey-white color for the label */
         }
+        
+        /* New class for consistent content panels */
+        .content-panel {
+            width: 100%;
+            flex-grow: 1;
+            overflow: auto; /* Handles both x and y scrolling */
+            box-sizing: border-box;
+        }
+
+        /* Ensure textareas within panels fill the space correctly */
+        .content-panel textarea {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background-color: #222;
+            color: var(--primary-text);
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre;
+            resize: none; /* Disable user resizing */
+        }
     </style>
 </head>
 <body>
@@ -232,7 +255,7 @@
                 <h2>Captured Events</h2>
                 <button class="refresh" onclick="fetchRecordings()">Refresh List</button>
             </div>
-            <div class="table-container">
+            <div class="table-container content-panel">
                 <table id="recordingsTable">
                     <thead>
                         <tr>
@@ -252,20 +275,26 @@
 
         <div id="capture_logs" class="section">
             <h2>Capture Logs</h2>
-            <textarea id="captureLogOutput" readonly></textarea>
+            <div class="content-panel">
+                <textarea id="captureLogOutput" readonly></textarea>
+            </div>
         </div>
         
         <div id="server_logs" class="section">
             <h2>System Logs</h2>
-            <textarea id="serverLogOutput" readonly></textarea>
+             <div class="content-panel">
+                <textarea id="serverLogOutput" readonly></textarea>
+            </div>
         </div>
 
         <div id="config" class="section">
             <h2>Configuration</h2>
-            <form id="configForm">
-                <!-- Configuration fields will be generated here -->
-                <button type="button" class="save" onclick="saveConfig()">Save Configuration</button>
-            </form>
+            <div class="content-panel">
+                <form id="configForm">
+                    <!-- Configuration fields will be generated here -->
+                    <button type="button" class="save" onclick="saveConfig()">Save Configuration</button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -288,7 +317,7 @@
             
             setInterval(fetchStatus, 5000);
             setInterval(fetchServerLogs, 7000);
-            setInterval(fetchCaptureLogs, 3000); // Poll capture logs more frequently
+            setInterval(fetchCaptureLogs, 500); // Poll capture logs more frequently
             setInterval(fetchRecordings, 30000);
         });
 
@@ -301,6 +330,14 @@
             
             document.getElementById(tabName).classList.add('active');
             evt.currentTarget.classList.add('active');
+
+            // Ensure sections inside tabs with .content-panel are also flexed
+             const activeSection = document.getElementById(tabName);
+            if (activeSection) {
+                activeSection.style.display = 'flex';
+                activeSection.style.flexDirection = 'column';
+                activeSection.style.flexGrow = '1';
+            }
         }
 
         async function fetchData(url, method = 'GET', data = null) {
@@ -452,9 +489,9 @@
             const elements = configForm.elements;
             for (let i = 0; i < elements.length; i++) {
                 if (elements[i].name) {
-                    if (elements[i].type === 'number') {
+                    if (elements[i].type === 'number' && elements[i].value !== '') {
                         config[elements[i].name] = parseInt(elements[i].value, 10);
-                    } else {
+                    } else if (elements[i].value !== '') {
                         config[elements[i].name] = elements[i].value;
                     }
                 }

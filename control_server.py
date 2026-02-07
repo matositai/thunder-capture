@@ -77,6 +77,16 @@ def load_config():
         print(f"Warning: {CONFIG_FILE} not found or invalid.", file=sys.stderr)
         return {}
 
+def save_config(data):
+    """Saves the provided dictionary to config.json."""
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(data, f, indent=4)
+        return True
+    except IOError as e:
+        print(f"Error saving configuration to {CONFIG_FILE}: {e}", file=sys.stderr)
+        return False
+
 # --- Main Recorder Lifecycle ---
 
 def recorder_lifecycle(config, stop_event_flag):

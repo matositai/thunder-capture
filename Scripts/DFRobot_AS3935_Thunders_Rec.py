@@ -135,12 +135,22 @@ def main():
         
         # Initialize Sensor
         sensor = DFRobot_AS3935(AS3935_I2C_ADDR, bus=1)
-        if not sensor.reset():
+        reset_success = sensor.reset()
+        if not reset_success:
             logger.error("Sensor init failed. Exiting.")
             sys.exit(1)
+        logger.info(f"Sensor reset successful: {reset_success}")
             
         sensor.power_up()
+        logger.info("Sensor powered up.")
         
+        # Log parsed arguments and config values
+        logger.info(f"Indoor/Outdoor setting received: {'Indoor' if args.indoor else 'Outdoor'}")
+        logger.info(f"AS3935_CAPACITANCE: {AS3935_CAPACITANCE}")
+        logger.info(f"Configured Noise Floor Level 1: {config.get('noise_floor_lv1', 2)}")
+        logger.info(f"Configured Watchdog Threshold: {config.get('watchdog_threshold', 2)}")
+        logger.info(f"Configured Spike Rejection: {config.get('spike_rejection', 2)}")
+
         # Configure for indoor/outdoor based on argument
         if args.indoor:
             sensor.set_indoors()

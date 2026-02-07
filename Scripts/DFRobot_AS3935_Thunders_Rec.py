@@ -4,6 +4,7 @@ import time
 import json
 import logging
 import threading
+import argparse # Import argparse
 
 # This script is now a one-shot detector. It initializes the sensor,
 # waits for a lightning event, prints the event data as JSON to stdout,
@@ -22,6 +23,7 @@ except (ImportError, RuntimeError):
         def reset(self): return True
         def power_up(self): pass
         def set_indoors(self): pass
+        def set_outdoors(self): pass # Added set_outdoors for completeness
         def disturber_en(self): pass
         def set_irq_output_source(self, val): pass
         def set_tuning_caps(self, val): pass
@@ -53,6 +55,12 @@ try:
 except Exception as e:
     print(f"FATAL: Could not load {CONFIG_FILE}. Error: {e}", file=sys.stderr)
     sys.exit(1)
+
+# --- Argument Parsing ---
+parser = argparse.ArgumentParser(description="One-shot lightning detector script for AS3935.")
+parser.add_argument('--indoor', action='store_true', help='Configure AS3935 for indoor operation.')
+args = parser.parse_args()
+
 
 # --- Logging Setup ---
 LOG_FILE = os.path.join(os.path.dirname(__file__), '..', config.get("log_file", "thunder_recorder.log"))
@@ -132,7 +140,15 @@ def main():
             sys.exit(1)
             
         sensor.power_up()
-        sensor.set_indoors()
+        
+        # Configure for indoor/outdoor based on argument
+        if args.indoor:
+            sensor.set_indoors()
+            logger.info("AS3935 configured for indoor operation.")
+        else:
+            sensor.set_outdoors()
+            logger.info("AS3935 configured for outdoor operation.")
+            
         sensor.disturber_en()
         sensor.set_irq_output_source(0)
         time.sleep(0.5)

@@ -72,10 +72,13 @@ def load_config():
     """Loads the configuration from config.json."""
     try:
         with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
+            config = json.load(f)
+            if "is_indoor" not in config:
+                config["is_indoor"] = False # Default to outdoor
+            return config
     except (FileNotFoundError, json.JSONDecodeError):
-        print(f"Warning: {CONFIG_FILE} not found or invalid.", file=sys.stderr)
-        return {}
+        print(f"Warning: {CONFIG_FILE} not found or invalid. Using default config.", file=sys.stderr)
+        return {"is_indoor": False} # Return a default config if file is missing or invalid
 
 def save_config(data):
     """Saves the provided dictionary to config.json."""
@@ -107,10 +110,14 @@ def recorder_lifecycle(config, stop_event_flag):
 
         if IS_RASPBERRY_PI:
             script_path = os.path.join(os.path.dirname(__file__), config.get("thunder_recorder_script"))
+            detector_command = ['python3', '-u', script_path]
+            if config.get("is_indoor", False): # Pass --indoor flag if configured
+                detector_command.append('--indoor')
+
             try:
                 # Use line-buffering (bufsize=1) and text mode
                 detector_process = subprocess.Popen(
-                    ['python3', '-u', script_path], # -u for unbuffered output
+                    detector_command,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT, # Redirect stderr to stdout
                     text=True,

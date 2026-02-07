@@ -11,5 +11,6 @@
     "thunder_recorder_script": "Scripts/DFRobot_AS3935_Thunders_Rec.py",
     "log_file": "thunder_recorder.log",
     "database_file": "db/recordings.db",
-    "waveform_directory": "static/waveforms"
+    "waveform_directory": "static/waveforms",
+    "is_indoor": false
 }

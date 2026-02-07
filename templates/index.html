@@ -222,7 +222,8 @@
 
         <div class="tab-nav">
             <button class="tab-button active" onclick="openTab(event, 'events')">Events</button>
-            <button class="tab-button" onclick="openTab(event, 'logs')">Logs</button>
+            <button class="tab-button" onclick="openTab(event, 'capture_logs')">Capture Logs</button>
+            <button class="tab-button" onclick="openTab(event, 'server_logs')">Server Logs</button>
             <button class="tab-button" onclick="openTab(event, 'config')">Configuration</button>
         </div>
 
@@ -249,9 +250,14 @@
             </div>
         </div>
 
-        <div id="logs" class="section">
+        <div id="capture_logs" class="section">
+            <h2>Capture Logs</h2>
+            <textarea id="captureLogOutput" readonly></textarea>
+        </div>
+        
+        <div id="server_logs" class="section">
             <h2>System Logs</h2>
-            <textarea id="logOutput" readonly></textarea>
+            <textarea id="serverLogOutput" readonly></textarea>
         </div>
 
         <div id="config" class="section">
@@ -266,7 +272,8 @@
     <script>
         const detectorStatusSpan = document.getElementById('detectorStatus');
         const stopDetectorButton = document.getElementById('stopDetectorButton');
-        const logOutput = document.getElementById('logOutput');
+        const serverLogOutput = document.getElementById('serverLogOutput');
+        const captureLogOutput = document.getElementById('captureLogOutput');
         const configForm = document.getElementById('configForm');
         const recordingsTableBody = document.querySelector('#recordingsTable tbody');
 
@@ -275,11 +282,13 @@
             createConfigFields();
             fetchConfig();
             fetchStatus();
-            fetchLogs();
+            fetchServerLogs();
+            fetchCaptureLogs();
             fetchRecordings();
             
             setInterval(fetchStatus, 5000);
-            setInterval(fetchLogs, 7000);
+            setInterval(fetchServerLogs, 7000);
+            setInterval(fetchCaptureLogs, 3000); // Poll capture logs more frequently
             setInterval(fetchRecordings, 30000);
         });
 
@@ -366,11 +375,19 @@
             }
         }
 
-        async function fetchLogs() {
-            const data = await fetchData('/api/logs');
+        async function fetchServerLogs() {
+            const data = await fetchData('/api/server_logs');
             if (data && data.logs) {
-                logOutput.value = data.logs.join('');
-                logOutput.scrollTop = logOutput.scrollHeight;
+                serverLogOutput.value = data.logs.join('');
+                serverLogOutput.scrollTop = serverLogOutput.scrollHeight;
+            }
+        }
+
+        async function fetchCaptureLogs() {
+            const data = await fetchData('/api/capture_logs');
+            if (data && data.logs) {
+                captureLogOutput.value = data.logs.join('');
+                captureLogOutput.scrollTop = captureLogOutput.scrollHeight;
             }
         }
 

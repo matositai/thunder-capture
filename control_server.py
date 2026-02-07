@@ -26,9 +26,10 @@ recorder_thread = None
 stop_event = threading.Event()
 state_lock = threading.Lock()
 
-# In-memory log cache
+# In-memory log caches
 log_lock = threading.Lock()
-log_cache = collections.deque(maxlen=200)
+server_log_cache = collections.deque(maxlen=200)
+capture_log_cache = collections.deque(maxlen=500) # Larger cache for potentially verbose capture logs
 
 # --- Logging Setup ---
 
@@ -53,9 +54,9 @@ class StreamToLogger:
     def flush(self):
         self.original_stream.flush()
 
-# Redirect stdout and stderr
-sys.stdout = StreamToLogger(sys.stdout, log_cache, log_lock)
-sys.stderr = StreamToLogger(sys.stderr, log_cache, log_lock)
+# Redirect stdout and stderr to the server log cache
+sys.stdout = StreamToLogger(sys.stdout, server_log_cache, log_lock)
+sys.stderr = StreamToLogger(sys.stderr, server_log_cache, log_lock)
 
 
 # --- Helper Functions ---
@@ -90,36 +91,64 @@ def recorder_lifecycle(config, stop_event_flag):
         set_system_state("LISTENING")
         lightning_data = None
         
+        # Clear capture log before starting
+        with log_lock:
+            capture_log_cache.clear()
+
         if IS_RASPBERRY_PI:
             script_path = os.path.join(os.path.dirname(__file__), config.get("thunder_recorder_script"))
             try:
+                # Use line-buffering (bufsize=1) and text mode
                 detector_process = subprocess.Popen(
-                    ['python3', script_path],
+                    ['python3', '-u', script_path], # -u for unbuffered output
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
+                    stderr=subprocess.STDOUT, # Redirect stderr to stdout
+                    text=True,
+                    bufsize=1 
                 )
-                stdout, stderr = detector_process.communicate()
+                
+                # Stream output line by line
+                for line in iter(detector_process.stdout.readline, ''):
+                    if stop_event_flag.is_set():
+                        detector_process.terminate() # Stop the script if stop is signaled
+                        break
+                    
+                    # Log to both capture log and main server log
+                    with log_lock:
+                        capture_log_cache.append(line)
+                    print(f"[Detector] {line.strip()}") # Also log to main server log for context
 
-                if detector_process.returncode == 0 and stdout:
-                    # The script exits with 0 on successful detection
+                    # Check for the specific JSON output indicating detection
                     try:
-                        lightning_data = json.loads(stdout)
+                        # The script should ONLY output JSON upon successful detection
+                        potential_json = json.loads(line)
+                        if potential_json.get("event") == "lightning":
+                            lightning_data = potential_json
+                            break # Exit the loop to proceed with recording
                     except json.JSONDecodeError:
-                        print(f"Error: Could not decode JSON from detector script: {stdout}", file=sys.stderr)
-                elif stderr:
-                     print(f"Detector script error: {stderr}", file=sys.stderr)
+                        continue # Not a JSON line, just a regular log, so continue listening
+                
+                detector_process.stdout.close()
+                return_code = detector_process.wait()
+
+                if return_code != 0 and not lightning_data:
+                    print(f"Detector script exited with non-zero code: {return_code}", file=sys.stderr)
 
             except Exception as e:
                 print(f"Error running detector script: {e}", file=sys.stderr)
         else:
             # --- SIMULATION for local testing ---
             print("SIMULATION: Simulating lightning detection...")
+            with log_lock:
+                capture_log_cache.append("SIMULATOR: Listening for thunder...\n")
             time.sleep(15) # Wait for 15 seconds to simulate listening
             if stop_event_flag.is_set(): break
             # Fake a lightning event
             lightning_data = {"event": "lightning", "distance_km": 10, "intensity": 5000}
+            sim_log = f"SIMULATOR: Detected lightning! Data: {json.dumps(lightning_data)}\n"
             print(f"SIMULATION: {lightning_data}")
+            with log_lock:
+                capture_log_cache.append(sim_log)
 
         # --- 2. RECORDING State ---
         if lightning_data and lightning_data.get("event") == "lightning":
@@ -259,11 +288,18 @@ def get_recordings():
     all_recordings = database.get_all_recordings(db_path)
     return jsonify(all_recordings)
 
-@app.route('/api/logs')
-def get_logs():
+@app.route('/api/server_logs')
+def get_server_logs():
     with log_lock:
         # Create a snapshot of the current logs
-        logs = list(log_cache)
+        logs = list(server_log_cache)
+    return jsonify({"logs": logs})
+
+@app.route('/api/capture_logs')
+def get_capture_logs():
+    with log_lock:
+        # Create a snapshot of the current logs
+        logs = list(capture_log_cache)
     return jsonify({"logs": logs})
 
 @app.route('/api/start_recorder', methods=['POST'])

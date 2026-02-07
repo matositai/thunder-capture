@@ -37,7 +37,7 @@
             padding: 20px; 
             border-radius: 8px; 
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            color: var(--dark-bg); /* Set text color for the container */
+            color: var(--primary-text); /* Changed to primary-text for better visibility within container */
             display: flex; /* Enable flexbox for vertical layout */
             flex-direction: column; /* Stack children vertically */
             flex-grow: 1; /* Allow container to grow and fill space */
@@ -47,14 +47,6 @@
             color: var(--header-color);
             border-bottom: 2px solid var(--header-color);
             padding-bottom: 10px;
-        }
-
-        .section { display: none; } /* Initially hide all sections */
-        .section.active { display: block; } /* Show only the active one */
-        #events.active { /* Apply flex properties only when events tab is active */
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1; /* Allow events section to grow */
         }
 
         .status-item { margin-bottom: 10px; font-size: 1.1em; }
@@ -105,19 +97,6 @@
         button.sync { background-color: #555; color: white; }
         button.sync:hover { background-color: #777; }
         
-        textarea#logOutput {
-            width: calc(100% - 20px); 
-            height: 500px; 
-            padding: 10px; 
-            border: 1px solid var(--border-color); 
-            border-radius: 4px;
-            background-color: #222; 
-            color: var(--primary-text);
-            font-family: 'Courier New', Courier, monospace; 
-            white-space: pre;
-            overflow-y: scroll;
-        }
-
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--primary-text); }
         input[type="text"], input[type="number"] {
@@ -131,7 +110,7 @@
         }
         .disabled-input { background-color: #444; }
 
-        /* New Table Styles for Events */
+        /* New Table Styles for Signals */
         #recordingsTable { 
             width: 100%; 
             min-width: 700px; /* Ensure table can overflow horizontally */
@@ -177,7 +156,7 @@
             align-items: center;
             margin-bottom: 20px;
         }
-        .events-header {
+        .events-header { /* Renamed from events-header for consistency if needed */
             display: flex;
             justify-content: space-between; /* Pushes items to ends */
             align-items: center; /* Vertically centers items */
@@ -210,12 +189,14 @@
             flex-grow: 1;
             overflow: auto; /* Handles both x and y scrolling */
             box-sizing: border-box;
+            display: flex; /* Make content panel a flex container */
+            flex-direction: column; /* Stack children vertically within the panel */
         }
 
         /* Ensure textareas within panels fill the space correctly */
         .content-panel textarea {
             width: 100%;
-            height: 100%;
+            height: 100%; /* Fill available vertical space */
             box-sizing: border-box; /* Include padding and border in the element's total width and height */
             padding: 10px;
             border: 1px solid var(--border-color);
@@ -225,6 +206,23 @@
             font-family: 'Courier New', Courier, monospace;
             white-space: pre;
             resize: none; /* Disable user resizing */
+            flex-grow: 1; /* Allow textarea to grow and fill vertical space */
+        }
+
+        /* All sections are hidden by default */
+        .section {
+            display: none;
+            flex-direction: column; /* Default flex for sections to maintain layout */
+            flex-grow: 1; /* Allow sections to grow */
+        }
+        /* Only active section is displayed and set to flex */
+        .section.active {
+            display: flex;
+        }
+
+        /* Specific overrides if needed, but aim for general flex behavior */
+        #config .content-panel {
+            flex-grow: 0; /* Config form doesn't need to grow vertically */
         }
     </style>
 </head>
@@ -244,7 +242,7 @@
         </div>
 
         <div class="tab-nav">
-            <button class="tab-button active" onclick="openTab(event, 'events')">Events</button>
+            <button class="tab-button active" onclick="openTab(event, 'events')">Captured Signals</button>
             <button class="tab-button" onclick="openTab(event, 'capture_logs')">Capture Logs</button>
             <button class="tab-button" onclick="openTab(event, 'server_logs')">Server Logs</button>
             <button class="tab-button" onclick="openTab(event, 'config')">Configuration</button>
@@ -252,7 +250,7 @@
 
         <div id="events" class="section active">
             <div class="events-header">
-                <h2>Captured Events</h2>
+                <h2>Captured Signals</h2>
                 <button class="refresh" onclick="fetchRecordings()">Refresh List</button>
             </div>
             <div class="table-container content-panel">
@@ -323,21 +321,13 @@
 
         function openTab(evt, tabName) {
             const sections = document.querySelectorAll('.section');
-            sections.forEach(s => s.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active')); // Hide all sections
             
             const tabButtons = document.querySelectorAll('.tab-button');
-            tabButtons.forEach(b => b.classList.remove('active'));
+            tabButtons.forEach(b => b.classList.remove('active')); // Deactivate all buttons
             
-            document.getElementById(tabName).classList.add('active');
-            evt.currentTarget.classList.add('active');
-
-            // Ensure sections inside tabs with .content-panel are also flexed
-             const activeSection = document.getElementById(tabName);
-            if (activeSection) {
-                activeSection.style.display = 'flex';
-                activeSection.style.flexDirection = 'column';
-                activeSection.style.flexGrow = '1';
-            }
+            document.getElementById(tabName).classList.add('active'); // Show target section
+            evt.currentTarget.classList.add('active'); // Activate target button
         }
 
         async function fetchData(url, method = 'GET', data = null) {
@@ -366,14 +356,10 @@
                     detectorStatusSpan.style.color = 'var(--success-green)'; // Green for listening
                     stopDetectorButton.disabled = false; // Still allow stopping if listening
                     stopDetectorButton.classList.remove('button-disabled');
-                } else if (status.system_state === "IDLE") {
+                } else {
                     detectorStatusSpan.style.color = 'var(--border-color)'; // Orange for idle
                     stopDetectorButton.disabled = true;
                     stopDetectorButton.classList.add('button-disabled');
-                } else {
-                    detectorStatusSpan.style.color = 'var(--danger-red)'; // Red for other non-running states (e.g., ERROR)
-                    stopDetectorButton.disabled = false; // Allow stopping even if in error state, for example
-                    stopDetectorButton.classList.remove('button-disabled');
                 }
             }
         }
